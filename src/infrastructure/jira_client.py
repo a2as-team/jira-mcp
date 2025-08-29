@@ -431,6 +431,84 @@ class JiraClientService:
             )
             raise JiraConnectionError(f"Failed to get project issues: {str(e)}")
 
+    def get_transitions(self, issue_key: str) -> List[Dict[str, str]]:
+        """
+        Get available transitions for an issue.
+        
+        Args:
+            issue_key: Key of the issue (e.g., "PROJECT-123")
+            
+        Returns:
+            List of available transitions with id and name
+            
+        Raises:
+            IssueNotFoundError: If issue is not found
+            JiraConnectionError: If connection to Jira fails
+        """
+        try:
+            logger.debug(f"Getting transitions for issue: {issue_key}")
+            transitions = self._client.transitions(issue_key)
+            
+            # Convert to a clean list of dict with id and name
+            transition_list = [
+                {
+                    'id': transition['id'], 
+                    'name': transition['name']
+                } 
+                for transition in transitions
+            ]
+            
+            logger.debug(f"Found {len(transition_list)} transitions for {issue_key}")
+            return transition_list
+            
+        except JIRAError as e:
+            if e.status_code == 404:
+                raise IssueNotFoundError(f"Issue '{issue_key}' not found")
+            else:
+                logger.error(f"Failed to get transitions for {issue_key}: {str(e)}")
+                raise JiraConnectionError(f"Failed to get transitions: {str(e)}")
+        except Exception as e:
+            logger.error(f"Unexpected error getting transitions for {issue_key}: {str(e)}")
+            raise JiraConnectionError(f"Failed to get transitions: {str(e)}")
+
+    def transition_issue(self, issue_key: str, transition_id: str, comment: str = "") -> bool:
+        """
+        Transition an issue to a new status.
+        
+        Args:
+            issue_key: Key of the issue (e.g., "PROJECT-123")
+            transition_id: ID of the transition to execute
+            comment: Optional comment to add during transition
+            
+        Returns:
+            True if transition was successful
+            
+        Raises:
+            IssueNotFoundError: If issue is not found
+            JiraConnectionError: If connection to Jira fails or transition is invalid
+        """
+        try:
+            logger.debug(f"Transitioning issue {issue_key} with transition ID {transition_id}")
+            
+            # Execute the transition
+            self._client.transition_issue(issue_key, transition_id)
+            
+            logger.info(f"Successfully transitioned issue {issue_key} with transition {transition_id}")
+            return True
+            
+        except JIRAError as e:
+            if e.status_code == 404:
+                raise IssueNotFoundError(f"Issue '{issue_key}' not found")
+            elif e.status_code == 400:
+                logger.error(f"Invalid transition {transition_id} for issue {issue_key}: {str(e)}")
+                raise JiraConnectionError(f"Invalid transition: {str(e)}")
+            else:
+                logger.error(f"Failed to transition issue {issue_key}: {str(e)}")
+                raise JiraConnectionError(f"Failed to transition issue: {str(e)}")
+        except Exception as e:
+            logger.error(f"Unexpected error transitioning issue {issue_key}: {str(e)}")
+            raise JiraConnectionError(f"Failed to transition issue: {str(e)}")
+
 
 # Global client instance
 _jira_client_service: Optional[JiraClientService] = None

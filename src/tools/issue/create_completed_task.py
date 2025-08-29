@@ -6,6 +6,7 @@ with worklog already added.
 """
 
 from datetime import datetime
+from typing import Tuple
 
 from ...infrastructure.jira_client import get_jira_client
 from ...domain.services.project_service import ProjectService
@@ -79,7 +80,7 @@ def _prepare_completed_task_fields(issue_input: IssueCreateInput, project_key: s
     return issue_fields
 
 
-def _transition_to_done(jira_client, issue_key: str) -> bool:
+def _transition_to_done(jira_client, issue_key: str) -> Tuple[bool, str]:
     """
     Transition issue to Done status.
     
@@ -88,32 +89,50 @@ def _transition_to_done(jira_client, issue_key: str) -> bool:
         issue_key: Issue key to transition
         
     Returns:
-        bool: True if transition was successful
+        tuple: (success: bool, message: str)
     """
     try:
         # Get available transitions
+        logger.info(f"Getting available transitions for issue {issue_key}")
         transitions = jira_client.get_transitions(issue_key)
         
-        # Find Done transition (common names: Done, Concluído, Finished, Resolved)
-        done_transitions = [
-            t for t in transitions 
-            if t['name'].lower() in ['done', 'concluído', 'finished', 'resolved', 'fechado', 'complete']
+        logger.debug(f"Available transitions for {issue_key}: {[t['name'] for t in transitions]}")
+        
+        # Find Done transition (common names: Done, Concluído, Finished, Resolved, etc.)
+        done_keywords = [
+            'done', 'concluído', 'concluido', 'finished', 'resolved', 
+            'fechado', 'complete', 'completo', 'finalizado', 'pronto'
         ]
         
+        done_transitions = []
+        for transition in transitions:
+            transition_name_lower = transition['name'].lower().strip()
+            if any(keyword in transition_name_lower for keyword in done_keywords):
+                done_transitions.append(transition)
+        
         if done_transitions:
-            transition_id = done_transitions[0]['id']
+            # Use the first matching Done transition
+            selected_transition = done_transitions[0]
+            transition_id = selected_transition['id']
+            transition_name = selected_transition['name']
+            
+            logger.info(f"Attempting to transition issue {issue_key} to '{transition_name}' (ID: {transition_id})")
             jira_client.transition_issue(issue_key, transition_id)
-            logger.info(f"Transitioned issue {issue_key} to Done")
-            return True
+            
+            success_message = f"Successfully transitioned to '{transition_name}'"
+            logger.info(f"Issue {issue_key} {success_message}")
+            return True, success_message
+            
         else:
-            logger.warning(f"No 'Done' transition found for issue {issue_key}")
-            available_transitions = [t['name'] for t in transitions]
-            logger.info(f"Available transitions: {available_transitions}")
-            return False
+            available_names = [t['name'] for t in transitions]
+            warning_message = f"No 'Done' transition found. Available: {', '.join(available_names)}"
+            logger.warning(f"Issue {issue_key}: {warning_message}")
+            return False, warning_message
             
     except Exception as e:
-        logger.error(f"Failed to transition issue {issue_key} to Done: {str(e)}")
-        return False
+        error_message = f"Failed to transition to Done: {str(e)}"
+        logger.error(f"Issue {issue_key}: {error_message}")
+        return False, error_message
 
 
 def _add_completion_worklog(jira_client, issue_input: IssueCreateInput, issue_key: str) -> str:
@@ -228,16 +247,16 @@ def create_completed_task(
             worklog_message = _add_completion_worklog(jira_client, issue_input, new_issue.key)
             
             # Transition to Done
-            transition_success = _transition_to_done(jira_client, new_issue.key)
+            transition_success, transition_message = _transition_to_done(jira_client, new_issue.key)
             
             # Prepare success message
             success_message = f"✅ Completed task {new_issue.key} created successfully!"
             success_message += worklog_message
             
             if transition_success:
-                success_message += " Status: Done ✅"
+                success_message += f" Status: {transition_message} ✅"
             else:
-                success_message += " ⚠️ Could not automatically set to Done status - please do it manually."
+                success_message += f" ⚠️ Status transition failed: {transition_message}"
             
             # Add issue URL
             issue_url = jira_client.get_issue_url(new_issue.key)

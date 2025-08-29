@@ -45,10 +45,12 @@ issue_agent = Agent(
     
     Passos para criar tasks concluídas:
     - NÃO cumprimente o usuário
-    - Use create_completed_task quando o usuário quer uma task já finalizada
+    - SEMPRE use create_completed_task quando o usuário pedir task "concluída", "finalizada", "done" ou similar
+    - Esta tool automaticamente: cria issue + adiciona worklog + marca como "Concluído"
     - Certifique-se de que tem projeto e título/resumo da task
-    - Colete tempo gasto (padrão 1h se não especificado)
-    - Use create_completed_task que automaticamente marca como Done e adiciona worklog
+    - Colete tempo gasto (padrão 1h se não especificado) 
+    - Colete data do trabalho (aceita "hoje", "ontem", "DD-MM-YYYY")
+    - Confirme o sucesso da criação E da transição de status
     
     Para criação de issues, sempre colete pelo menos:
     - Projeto (chave ou nome)

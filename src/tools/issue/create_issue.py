@@ -5,7 +5,7 @@ This tool allows the agent to create a new issue in Jira with validation and opt
 """
 
 from datetime import datetime
-from google.adk.tools import FunctionTool, ToolContext
+from google.adk.tools import ToolContext
 
 from ...infrastructure.jira_client import get_jira_client
 from ...domain.services.project_service import ProjectService
@@ -18,7 +18,7 @@ from ...core.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-def create_issue_function(
+def create_issue(
     project_identifier: str,
     summary: str,
     description: str = "",
@@ -175,5 +175,3 @@ def create_issue_function(
         return error_msg
 
 
-# Create the FunctionTool instance
-create_issue = FunctionTool(func=create_issue_function)

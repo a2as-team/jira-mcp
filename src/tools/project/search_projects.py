@@ -5,10 +5,6 @@ This tool allows the agent to search for Jira projects by name or key,
 or list all available projects.
 """
 
-from typing import Union, Dict, Any
-from pydantic import BaseModel, Field
-from google.adk.tools import FunctionTool, ToolContext
-
 from ...infrastructure.jira_client import get_jira_client
 from ...domain.services.project_service import ProjectService
 from ...core.exceptions import JiraConnectionError
@@ -17,20 +13,7 @@ from ...core.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-class SearchProjectsInput(BaseModel):
-    """Esquema de entrada para buscar projetos do Jira."""
-    
-    search_term: str = Field(
-        default="",
-        description=(
-            "Termo de busca opcional para filtrar projetos por nome ou chave. "
-            "Se vazio, todos os projetos disponíveis serão listados. "
-            "Exemplos: 'Mobile', 'PROJ', 'website'"
-        )
-    )
-
-
-def search_projects_function(search_term: str = "", tool_context: ToolContext = None) -> str:
+def search_projects(search_term: str = "") -> str:
     """
     Busca projetos do Jira ou lista todos os projetos disponíveis.
     

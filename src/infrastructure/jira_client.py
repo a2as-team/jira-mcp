@@ -20,6 +20,8 @@ from ..core.exceptions import (
     PermissionError
 )
 from ..core.error_handler import ErrorHandler
+from .url_utils import JiraUrlUtils
+from .jql_builder import JqlBuilder
 
 logger = get_logger(__name__)
 
@@ -211,7 +213,7 @@ class JiraClientService:
             Tuple[Optional[str], Optional[str]]: (issue_key, error_message)
         """
         try:
-            jql = f'project = "{project_key}" AND summary ~ "{summary}" ORDER BY created DESC'
+            jql = JqlBuilder.search_by_summary(summary, project_key)
             issues = self.search_issues(jql, max_results=20)
             
             if len(issues) == 1:
@@ -241,8 +243,7 @@ class JiraClientService:
             Tuple[List[Issue], Optional[str]]: (matching_issues, error_message)
         """
         try:
-            # Use JQL to search across all projects by summary
-            jql = f'summary ~ "{summary}" ORDER BY created DESC'
+            jql = JqlBuilder.search_all_projects(summary)
             issues = self.search_issues(jql, max_results=max_results)
             
             return issues, None
@@ -263,16 +264,8 @@ class JiraClientService:
             str: Full URL to the issue in Jira web interface
         """
         try:
-            # Get the server URL from settings
-            from ..core.config import get_settings
             settings = get_settings()
-            
-            # Remove /rest/api/2 or similar API paths and trailing slashes
-            server_url = settings.jira_server_url.rstrip('/')
-            if '/rest/api' in server_url:
-                server_url = server_url.split('/rest/api')[0]
-            
-            return f"{server_url}/browse/{issue_key}"
+            return JiraUrlUtils.build_issue_url(settings.jira_server_url, issue_key)
             
         except Exception as e:
             logger.warning(f"Could not generate issue URL for {issue_key}: {e}")
@@ -419,15 +412,7 @@ class JiraClientService:
             JiraConnectionError: If unable to fetch issues
         """
         try:
-            # Build JQL query
-            jql = f'project = "{project_key}"'
-            
-            if status_filter:
-                jql += f' AND status = "{status_filter}"'
-            
-            jql += ' ORDER BY created DESC'
-            
-            # Search for issues
+            jql = JqlBuilder.get_project_issues(project_key, status_filter)
             issues = self.search_issues(jql, max_results=max_results)
             
             ErrorHandler.log_info(

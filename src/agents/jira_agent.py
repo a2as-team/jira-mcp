@@ -5,84 +5,98 @@ This module defines the primary agent that handles all Jira interactions
 using the proper ADK patterns and tools.
 """
 
-from google.adk.agents import LlmAgent
+from google.adk.agents import Agent
 
 from ..core.config import get_settings
 from ..core.logging_config import get_logger
-from ..tools.project.search_projects import search_projects
-from ..tools.project.get_project_details import get_project_details
-from ..tools.issue.create_issue import create_issue
-from ..tools.issue.list_issues import list_issues  
-from ..tools.issue.add_worklog import add_worklog
+from ..core.callbacks import before_tool_callback, after_tool_callback, rate_limit_callback
+from .project_agent import project_agent
+from .issue_agent import issue_agent
+from .worklog_agent import worklog_agent
 
 logger = get_logger(__name__)
 
 
-def create_jira_agent() -> LlmAgent:
+def create_jira_agent() -> Agent:
     """
     Create and configure the main Jira agent.
     
     Returns:
-        LlmAgent: Configured Jira agent with all tools
+        Agent: Configured Jira agent with specialized sub-agents
     """
     settings = get_settings()
     
-    # Instrução do agente em português
+    # Instrução do agente coordenador em português
     instruction = """
-    Você é um assistente especializado em Jira que ajuda usuários a gerenciar seus projetos e issues.
+    Você é o assistente principal do Jira, responsável por coordenar operações através de agentes especializados.
     
-    Suas principais capacidades:
-    - Buscar e explorar projetos do Jira
-    - Obter informações detalhadas sobre projetos
-    - Listar issues de projetos específicos
-    - Criar novas issues com validação adequada
-    - Adicionar registros de tempo de trabalho a issues existentes
-    - Lidar com operações individuais e em lote
+    ARQUITETURA DE SUB-AGENTES:
+    Você trabalha com três agentes especializados:
+    - **project_agent**: Especialista em busca e detalhes de projetos
+    - **issue_agent**: Especialista em criação e listagem de issues
+    - **worklog_agent**: Especialista em registros de tempo de trabalho
     
-    Sempre priorize a segurança do usuário e integridade dos dados:
-    - Valide identificadores de projetos e issues antes de operações
-    - Forneça feedback claro sobre as ações realizadas
-    - Se algo falhar, explique o motivo e sugira alternativas
-    - Use operações em lote quando o usuário precisar realizar múltiplas ações similares
+    FLUXO DE TRABALHO:
+    1. Analise a solicitação do usuário e identifique qual área é necessária
+    2. Delegue para o agente especializado apropriado:
+       - Operações com projetos → project_agent
+       - Operações com issues → issue_agent  
+       - Operações com worklog → worklog_agent
+    3. Coordene múltiplos agentes quando necessário (ex: buscar projeto, depois criar issue)
+    4. Consolide e apresente os resultados finais de forma clara
     
-    Quando usuários perguntarem sobre informações de projetos, ajude-os a encontrar o projeto correto primeiro.
-    Ao criar issues, certifique-se de que todas as informações necessárias sejam fornecidas e validadas.
+    RESPONSABILIDADES DE COORDENAÇÃO:
+    - Identifique dependências entre operações (ex: precisa do projeto antes de criar issue)
+    - Passe informações necessárias entre agentes
+    - Valide que o usuário tenha as informações necessárias
+    - Forneça orientação e feedback consolidado
+    - Trate erros e coordene tentativas de recuperação
     
-    Seja conciso mas completo em suas respostas, e sempre confirme operações bem-sucedidas
-    com detalhes relevantes como chaves de issues ou URLs.
+    EXEMPLOS DE COORDENAÇÃO:
+    - "Criar issue no projeto X" → project_agent (buscar projeto) → issue_agent (criar issue)
+    - "Registrar tempo na issue Y" → worklog_agent (adicionar worklog)
+    - "Listar projetos" → project_agent (buscar projetos)
     
-    Responda sempre em português brasileiro, de forma clara e profissional.
+    Sempre priorize:
+    - Segurança e validação de dados
+    - Feedback claro sobre operações realizadas
+    - Coordenação eficiente entre agentes especializados
+    - Experiência fluida para o usuário
+    
+    Responda sempre em português brasileiro, coordenando os agentes especializados para
+    fornecer a melhor experiência possível ao usuário.
     """
     
-    # Create the agent with proper ADK configuration
-    agent = LlmAgent(
+    # Create the root agent with sub-agents architecture following ADK pattern
+    agent = Agent(
         name="JiraAgent",
         description=(
-            "Um agente de integração com Jira que ajuda usuários a gerenciar projetos e issues. "
-            "Pode buscar projetos, criar issues e lidar com várias operações do Jira "
-            "com validação adequada e tratamento de erros."
+            "Agente coordenador do Jira que gerencia operações através de agentes especializados. "
+            "Coordena project_agent para projetos, issue_agent para issues e worklog_agent para "
+            "registros de tempo, fornecendo uma experiência integrada e segura."
         ),
         model=settings.google_model,
         instruction=instruction,
-        tools=[
-            # Project tools
-            search_projects,
-            get_project_details,
-            
-            # Issue tools  
-            create_issue,
-            list_issues,
-            add_worklog,
-            
-            # Additional tools will be added here as they are implemented
-        ]
+        sub_agents=[
+            project_agent,
+            issue_agent,
+            worklog_agent
+        ],
+        # No tools needed on root agent - coordination is done through sub-agents
+        tools=[],
+        # Integrate security and logging callbacks
+        before_tool_callback=before_tool_callback,
+        after_tool_callback=after_tool_callback,
+        before_model_callback=rate_limit_callback
     )
     
     logger.info(
-        "Agente Jira criado com sucesso",
+        "Agente Jira coordenador criado com sucesso",
         extra={
             "model": settings.google_model,
-            "tools_count": len(agent.tools),
+            "sub_agents_count": len(agent.sub_agents) if hasattr(agent, 'sub_agents') else 0,
+            "sub_agents": ["project_agent", "issue_agent", "worklog_agent"],
+            "callbacks_enabled": True,
             "environment": settings.environment
         }
     )

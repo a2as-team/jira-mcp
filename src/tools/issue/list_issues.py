@@ -4,8 +4,6 @@ List issues tool for Jira Agent.
 This tool allows the agent to list issues from a specific project.
 """
 
-from typing import Optional
-
 from ...infrastructure.jira_client import get_jira_client
 from ...domain.services.issue_service import IssueService
 from ...domain.services.project_service import ProjectService

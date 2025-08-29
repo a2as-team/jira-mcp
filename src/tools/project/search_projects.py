@@ -26,11 +26,10 @@ def search_projects(search_term: str = "") -> str:
     Se nenhum termo de busca for fornecido, todos os projetos acessíveis são retornados.
     
     Args:
-        tool_input: Parâmetros de busca incluindo termo de busca opcional
-        tool_context: Contexto da ferramenta ADK
+        search_term: Optional search term to filter projects by name or key
         
     Returns:
-        str: Resultado formatado da operação
+        str: Formatted result of the operation
     """
     try:
         logger.info(f"Starting project search with term: '{search_term}'")
@@ -64,5 +63,3 @@ def search_projects(search_term: str = "") -> str:
         return error_msg
 
 
-# Create the FunctionTool instance
-search_projects = FunctionTool(func=search_projects_function)

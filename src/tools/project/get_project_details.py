@@ -4,9 +4,6 @@ Get project details tool for Jira Agent.
 This tool allows the agent to retrieve detailed information about a specific Jira project.
 """
 
-from pydantic import BaseModel, Field
-from google.adk.tools import FunctionTool, ToolContext
-
 from ...infrastructure.jira_client import get_jira_client
 from ...domain.services.project_service import ProjectService
 from ...core.exceptions import ProjectNotFoundError, JiraConnectionError
@@ -15,19 +12,7 @@ from ...core.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-class GetProjectDetailsInput(BaseModel):
-    """Esquema de entrada para obter detalhes do projeto."""
-    
-    project_identifier: str = Field(
-        ...,
-        description=(
-            "Identificador do projeto - pode ser a chave do projeto (ex: 'PROJ') ou nome do projeto (ex: 'Meu Projeto'). "
-            "A busca não diferencia maiúsculas de minúsculas e buscará em chaves, nomes ou descrições de projetos."
-        )
-    )
-
-
-def get_project_details_function(project_identifier: str, tool_context: ToolContext = None) -> str:
+def get_project_details(project_identifier: str) -> str:
     """
     Obtém informações detalhadas sobre um projeto específico do Jira.
     
@@ -37,11 +22,10 @@ def get_project_details_function(project_identifier: str, tool_context: ToolCont
     - Entender a estrutura e configuração do projeto
     
     Args:
-        tool_input: Parâmetros de identificação do projeto
-        tool_context: Contexto da ferramenta ADK
+        project_identifier: Project identifier - can be project key or name
         
     Returns:
-        str: Resultado formatado da operação
+        str: Formatted result of the operation
     """
     try:
         logger.info(f"Getting project details for: '{project_identifier}'")
@@ -76,5 +60,3 @@ def get_project_details_function(project_identifier: str, tool_context: ToolCont
         return error_msg
 
 
-# Create the FunctionTool instance
-get_project_details = FunctionTool(func=get_project_details_function)

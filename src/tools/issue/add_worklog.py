@@ -4,9 +4,6 @@ Add worklog tool for Jira Agent.
 This tool allows the agent to add time tracking entries to existing issues.
 """
 
-from typing import Optional
-from google.adk.tools import FunctionTool, ToolContext
-
 from ...infrastructure.jira_client import get_jira_client
 from ...domain.services.worklog_service import WorklogService
 from ...domain.models.worklog import WorklogCreateInput
@@ -16,12 +13,11 @@ from ...core.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-def add_worklog_function(
+def add_worklog(
     issue_identifier: str, 
     time_spent: str, 
     work_date: str = "", 
-    description: str = "", 
-    tool_context: ToolContext = None
+    description: str = ""
 ) -> str:
     """
     Adiciona registro de tempo de trabalho a uma issue existente do Jira.
@@ -37,7 +33,6 @@ def add_worklog_function(
         time_spent: Tempo gasto (ex: '2h 30m', '1d', '4h', '30m')
         work_date: Data do trabalho no formato YYYY-MM-DD (padrão: hoje)
         description: Descrição do trabalho realizado
-        tool_context: Contexto da ferramenta ADK
         
     Returns:
         str: Resultado da operação de adição de worklog
@@ -90,5 +85,3 @@ def add_worklog_function(
         return error_msg
 
 
-# Create the FunctionTool instance
-add_worklog = FunctionTool(func=add_worklog_function)

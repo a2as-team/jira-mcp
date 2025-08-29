@@ -327,15 +327,15 @@ class ValidationService:
         )
     
     @staticmethod
-    def validate_issue_create_data(data: Dict[str, Any]) -> ValidationResult:
+    def _validate_core_issue_fields(data: Dict[str, Any]) -> Tuple[List[str], List[str], Dict[str, Any]]:
         """
-        Valida dados completos para criação de issue.
+        Validate core issue fields (project, summary, description).
         
         Args:
-            data: Dicionário com dados da issue
+            data: Issue data dictionary
             
         Returns:
-            ValidationResult: Resultado da validação
+            Tuple[List[str], List[str], Dict[str, Any]]: (errors, warnings, sanitized_values)
         """
         errors = []
         warnings = []
@@ -367,7 +367,22 @@ class ValidationService:
         sanitized_values["description"] = desc_result.sanitized_value
         warnings.extend(desc_result.warnings)
         
-        # Validar estimativas de tempo
+        return errors, warnings, sanitized_values
+    
+    @staticmethod
+    def _validate_time_estimates(data: Dict[str, Any]) -> Tuple[List[str], Dict[str, Any]]:
+        """
+        Validate time estimate fields.
+        
+        Args:
+            data: Issue data dictionary
+            
+        Returns:
+            Tuple[List[str], Dict[str, Any]]: (errors, sanitized_values)
+        """
+        errors = []
+        sanitized_values = {}
+        
         for field in ["original_estimate", "remaining_estimate"]:
             if field in data:
                 time_result = ValidationService.validate_time_format(data[field])
@@ -375,16 +390,47 @@ class ValidationService:
                     errors.extend(time_result.errors)
                 else:
                     sanitized_values[field] = time_result.sanitized_value
+                    
+        return errors, sanitized_values
+    
+    @staticmethod
+    def _validate_assignee_data(data: Dict[str, Any]) -> Tuple[List[str], Dict[str, Any]]:
+        """
+        Validate assignee-related data.
         
-        # Validar email do responsável
+        Args:
+            data: Issue data dictionary
+            
+        Returns:
+            Tuple[List[str], Dict[str, Any]]: (errors, sanitized_values)
+        """
+        errors = []
+        sanitized_values = {}
+        
         if "assignee_email" in data:
             email_result = ValidationService.validate_email(data["assignee_email"])
             if not email_result.is_valid:
                 errors.extend(email_result.errors)
             else:
                 sanitized_values["assignee_email"] = email_result.sanitized_value
+                
+        return errors, sanitized_values
+    
+    @staticmethod
+    def _validate_worklog_if_present(data: Dict[str, Any]) -> Tuple[List[str], List[str], Dict[str, Any]]:
+        """
+        Validate worklog data if present.
         
-        # Validar dados de worklog se fornecidos
+        Args:
+            data: Issue data dictionary
+            
+        Returns:
+            Tuple[List[str], List[str], Dict[str, Any]]: (errors, warnings, sanitized_values)
+        """
+        errors = []
+        warnings = []
+        sanitized_values = {}
+        
         if data.get("time_spent"):
             worklog_result = ValidationService.validate_worklog_data(
                 data.get("time_spent", ""),
@@ -396,12 +442,51 @@ class ValidationService:
             else:
                 sanitized_values.update(worklog_result.sanitized_value)
             warnings.extend(worklog_result.warnings)
+            
+        return errors, warnings, sanitized_values
+    
+    @staticmethod
+    def validate_issue_create_data(data: Dict[str, Any]) -> ValidationResult:
+        """
+        Valida dados completos para criação de issue.
+        
+        Args:
+            data: Dicionário com dados da issue
+            
+        Returns:
+            ValidationResult: Resultado da validação
+        """
+        all_errors = []
+        all_warnings = []
+        all_sanitized = {}
+        
+        # Validate core fields
+        core_errors, core_warnings, core_sanitized = ValidationService._validate_core_issue_fields(data)
+        all_errors.extend(core_errors)
+        all_warnings.extend(core_warnings)
+        all_sanitized.update(core_sanitized)
+        
+        # Validate time estimates
+        time_errors, time_sanitized = ValidationService._validate_time_estimates(data)
+        all_errors.extend(time_errors)
+        all_sanitized.update(time_sanitized)
+        
+        # Validate assignee data
+        assignee_errors, assignee_sanitized = ValidationService._validate_assignee_data(data)
+        all_errors.extend(assignee_errors)
+        all_sanitized.update(assignee_sanitized)
+        
+        # Validate worklog if present
+        worklog_errors, worklog_warnings, worklog_sanitized = ValidationService._validate_worklog_if_present(data)
+        all_errors.extend(worklog_errors)
+        all_warnings.extend(worklog_warnings)
+        all_sanitized.update(worklog_sanitized)
         
         return ValidationResult(
-            is_valid=len(errors) == 0,
-            errors=errors,
-            warnings=warnings,
-            sanitized_value=sanitized_values
+            is_valid=len(all_errors) == 0,
+            errors=all_errors,
+            warnings=all_warnings,
+            sanitized_value=all_sanitized
         )
     
     @staticmethod
